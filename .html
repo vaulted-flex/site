@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Твой личный таймер Дня Рождения</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #16213e 100%);
+            color: #ffffff;
+            overflow-x: hidden;
+            min-height: 100vh;
+            transition: background 2s ease;
+            margin: 0;
+        }
+        /* Эффект праздничного режима */
+        body.birthday-mode {
+            animation: pulse-bg 5s infinite alternate;
+        }
+        @keyframes pulse-bg {
+            0% { opacity: 1; }
+            100% { opacity: 0.85; }
+        }
+        .mono { font-family: 'JetBrains+Mono', monospace; }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+        }
+        .timer-val {
+            background: linear-gradient(to bottom, #fff 0%, #ccc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+        .birthday-text {
+            background: linear-gradient(45deg, #f39c12, #e74c3c, #9b59b6, #3498db);
+            background-size: 300%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: rainbow-text 5s linear infinite;
+        }
+        @keyframes rainbow-text {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+        .input-glow:focus {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            outline: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+
+    <!-- Секция настройки -->
+    <div id="setup-screen" class="glass p-8 max-w-md w-full text-center hidden">
+        <h1 class="text-3xl font-bold mb-6">Добро пожаловать</h1>
+        <p class="text-gray-400 mb-8">Введите свои данные, чтобы мы могли поздравить вас вовремя</p>
+        <div class="space-y-4 text-left">
+            <div>
+                <label class="block text-sm mb-1 ml-1 text-gray-300">Ваше имя</label>
+                <input type="text" id="user-name" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 input-glow" placeholder="Имя">
+            </div>
+            <div>
+                <label class="block text-sm mb-1 ml-1 text-gray-300">Ваша почта (для поздравления)</label>
+                <input type="email" id="user-email" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 input-glow" placeholder="example@mail.com">
+            </div>
+            <div>
+                <label class="block text-sm mb-1 ml-1 text-gray-300">Дата рождения</label>
+                <input type="date" id="user-dob" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 input-glow">
+            </div>
+            <button onclick="saveData()" class="w-full bg-blue-600 hover:bg-blue-500 transition-colors py-3 rounded-xl font-bold text-lg mt-4 shadow-lg">
+                Начать отсчёт
+            </button>
+        </div>
+    </div>
+
+    <!-- Секция таймера -->
+    <div id="timer-screen" class="w-full max-w-5xl hidden flex flex-col items-center">
+        <h2 id="greeting-title" class="text-2xl md:text-3xl font-light mb-12 tracking-widest uppercase text-center">До вашего праздника осталось</h2>
+        
+        <div id="timer-container" class="grid grid-cols-2 md:grid-cols-5 gap-4 w-full">
+            <div class="glass p-6 flex flex-col items-center">
+                <span id="days" class="timer-val text-5xl md:text-7xl mono">00</span>
+                <span class="text-gray-400 text-xs mt-2 uppercase">Дней</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <span id="hours" class="timer-val text-5xl md:text-7xl mono">00</span>
+                <span class="text-gray-400 text-xs mt-2 uppercase">Часов</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <span id="minutes" class="timer-val text-5xl md:text-7xl mono">00</span>
+                <span class="text-gray-400 text-xs mt-2 uppercase">Минут</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <span id="seconds" class="timer-val text-5xl md:text-7xl mono">00</span>
+                <span class="text-gray-400 text-xs mt-2 uppercase">Секунд</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center col-span-2 md:col-span-1">
+                <span id="milliseconds" class="timer-val text-4xl md:text-5xl mono text-blue-400">000</span>
+                <span class="text-gray-400 text-xs mt-2 uppercase">мс</span>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center">
+            <p id="birthday-info" class="text-gray-400 italic font-light"></p>
+            <button onclick="resetData()" class="mt-8 text-gray-500 hover:text-white transition-all text-sm underline decoration-dotted hover:scale-105 active:scale-95">
+                Изменить данные
+            </button>
+        </div>
+    </div>
+
+    <!-- Модальное окно поздравления -->
+    <div id="congrats-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-6">
+        <div class="glass p-10 max-w-lg w-full text-center">
+            <h1 class="text-6xl mb-4 animate-bounce">🎂</h1>
+            <h2 class="text-3xl font-bold mb-4 birthday-text">С Днём Рождения!</h2>
+            <p id="modal-message" class="text-lg text-gray-300 leading-relaxed mb-8"></p>
+            <button onclick="closeModal()" class="bg-white text-black px-8 py-2 rounded-full font-bold transition-transform hover:scale-110">Спасибо!</button>
+        </div>
+    </div>
+
+    <script>
+        const wishes = [
+            "Пусть этот год станет временем невероятных открытий и исполнения самых смелых желаний!",
+            "Желаю, чтобы каждый твой день был наполнен смыслом, а сердце — теплом.",
+            "Пусть успех следует за тобой по пятам, а радость будет постоянным спутником!",
+            "Ты — удивительный человек. Пусть этот новый год жизни принесет море счастья.",
+            "Желаю гармонии в душе, блеска в глазах и неиссякаемого вдохновения!"
+        ];
+
+        let userData = null;
+        let timerInterval = null;
+        let confettiInterval = null;
+        let isBirthdayActive = false;
+
+        // Загрузка данных
+        function loadUserData() {
+            try {
+                const data = localStorage.getItem('bday_user_data');
+                return data ? JSON.parse(data) : null;
+            } catch (e) {
+                console.error("Ошибка загрузки данных", e);
+                return null;
+            }
+        }
+
+        // Сохранение
+        function saveData() {
+            const name = document.getElementById('user-name').value.trim();
+            const email = document.getElementById('user-email').value.trim();
+            const dob = document.getElementById('user-dob').value;
+
+            if (!name || !email || !dob) {
+                alert("Пожалуйста, заполните все поля!");
+                return;
+            }
+
+            userData = { name, email, dob, lastYearNotified: null };
+            localStorage.setItem('bday_user_data', JSON.stringify(userData));
+            initApp();
+        }
+
+        // Сброс данных (Исправлено: теперь останавливает праздник)
+        function resetData() {
+            // Останавливаем все таймеры
+            if (timerInterval) clearInterval(timerInterval);
+            if (confettiInterval) clearInterval(confettiInterval);
+            
+            // Убираем праздничные эффекты
+            deactivateBirthdayEffects();
+            
+            // Удаляем данные
+            localStorage.removeItem('bday_user_data');
+            userData = null;
+            
+            // Очищаем инпуты
+            document.getElementById('user-name').value = '';
+            document.getElementById('user-email').value = '';
+            document.getElementById('user-dob').value = '';
+
+            // Переключаем экраны
+            document.getElementById('timer-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            
+            // Удаляем оставшиеся конфетти
+            const existingConfetti = document.querySelectorAll('.confetti');
+            existingConfetti.forEach(c => c.remove());
+        }
+
+        function initApp() {
+            userData = loadUserData();
+            
+            if (!userData) {
+                document.getElementById('setup-screen').classList.remove('hidden');
+                document.getElementById('timer-screen').classList.add('hidden');
+            } else {
+                document.getElementById('setup-screen').classList.add('hidden');
+                document.getElementById('timer-screen').classList.remove('hidden');
+                document.getElementById('birthday-info').innerText = `Готовим поздравление для ${userData.name}`;
+                startCountdown();
+            }
+        }
+
+        function startCountdown() {
+            if (timerInterval) clearInterval(timerInterval);
+
+            timerInterval = setInterval(() => {
+                if (!userData) return;
+
+                const now = new Date();
+                const birthDate = new Date(userData.dob);
+                
+                // Устанавливаем ДР в текущем году
+                let nextBday = new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+                
+                const isToday = now.getMonth() === birthDate.getMonth() && now.getDate() === birthDate.getDate();
+
+                if (isToday) {
+                    if (!isBirthdayActive) {
+                        activateBirthdayEffects();
+                    }
+                    handleBirthday(now.getFullYear());
+                } else {
+                    if (isBirthdayActive) {
+                        deactivateBirthdayEffects();
+                    }
+                }
+
+                // Если ДР уже прошел в этом году, считаем до следующего
+                if (now > nextBday && !isToday) {
+                    nextBday.setFullYear(now.getFullYear() + 1);
+                }
+
+                let diff = nextBday - now;
+                if (isToday) diff = 0; // В сам праздник обнуляем таймер
+
+                const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((diff % (1000 * 60)) / 1000);
+                const ms = Math.floor(diff % 1000);
+
+                document.getElementById('days').innerText = d.toString().padStart(2, '0');
+                document.getElementById('hours').innerText = h.toString().padStart(2, '0');
+                document.getElementById('minutes').innerText = m.toString().padStart(2, '0');
+                document.getElementById('seconds').innerText = s.toString().padStart(2, '0');
+                document.getElementById('milliseconds').innerText = ms.toString().padStart(3, '0');
+            }, 60);
+        }
+
+        function activateBirthdayEffects() {
+            if (isBirthdayActive) return;
+            isBirthdayActive = true;
+            document.body.classList.add('birthday-mode');
+            const title = document.getElementById('greeting-title');
+            title.innerText = "С ДНЁМ РОЖДЕНИЯ! ТВОЙ ДЕНЬ НАСТАЛ!";
+            title.classList.add('birthday-text', 'font-bold');
+            
+            confettiInterval = setInterval(() => {
+                createConfetti(5);
+            }, 400);
+        }
+
+        function deactivateBirthdayEffects() {
+            isBirthdayActive = false;
+            document.body.classList.remove('birthday-mode');
+            const title = document.getElementById('greeting-title');
+            if (title) {
+                title.innerText = "До вашего праздника осталось";
+                title.classList.remove('birthday-text', 'font-bold');
+            }
+            if (confettiInterval) {
+                clearInterval(confettiInterval);
+                confettiInterval = null;
+            }
+        }
+
+        function handleBirthday(year) {
+            if (userData.lastYearNotified !== year) {
+                const randomWish = wishes[Math.floor(Math.random() * wishes.length)];
+                showCongrats(randomWish);
+                sendEmail(randomWish);
+
+                userData.lastYearNotified = year;
+                localStorage.setItem('bday_user_data', JSON.stringify(userData));
+            }
+        }
+
+        function showCongrats(message) {
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('congrats-modal').style.display = 'flex';
+            createConfetti(50);
+        }
+
+        function closeModal() {
+            document.getElementById('congrats-modal').style.display = 'none';
+        }
+
+        function sendEmail(message) {
+            // Здесь можно добавить реальный EmailJS, если есть ServiceID и TemplateID
+            console.log("Email Simulation for:", userData.email);
+            const notification = document.createElement('div');
+            notification.className = "fixed bottom-4 right-4 bg-green-600 text-white p-4 rounded-xl shadow-2xl z-[100]";
+            notification.innerText = "📧 Поздравление отправлено на почту!";
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function createConfetti(count) {
+            if (!isBirthdayActive && count < 20) return; // Не создаем новые, если режим выключен
+
+            for (let i = 0; i < count; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = '-20px';
+                confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
+                confetti.style.width = (Math.random() * 8 + 5) + 'px';
+                confetti.style.height = confetti.style.width;
+                confetti.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
+                
+                if (Math.random() > 0.5) confetti.style.borderRadius = '50%';
+                
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 4000);
+            }
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
