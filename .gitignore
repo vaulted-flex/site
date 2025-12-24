@@ -1,6 +1,6 @@
 # Build and Release Folders
-bin-debug/
-bin-release/
+#bin-debug/
+#bin-release/
 [Oo]bj/
 [Bb]in/
 
@@ -8,7 +8,7 @@ bin-release/
 .settings/
 
 # Executables
-*.swf
+#*.swf
 *.air
 *.ipa
 *.apk
